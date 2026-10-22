@@ -1,0 +1,40 @@
+# Tower radio: pick a preset in HA and the tower radio stick on the plane radar Pi tunes to it.
+# The Pi's tuning service (port 8091) only switches between its preset files.
+# Change YOUR_PI_IP (2 places) to your Pi's address.
+rest:
+  - resource: http://YOUR_PI_IP:8091/status
+    scan_interval: 15
+    timeout: 10
+    sensor:
+      - name: Tower Radio Preset
+        unique_id: tower_radio_preset
+        icon: mdi:radio-tower
+        value_template: "{{ value_json.title }}"
+        json_attributes:
+          - preset
+          - presets
+
+rest_command:
+  tower_radio_tune:
+    url: "http://YOUR_PI_IP:8091/tune?preset={{ preset }}"
+    method: get
+    timeout: 20
+
+template:
+  - select:
+      - name: Tower Radio
+        unique_id: tower_radio_select
+        icon: mdi:radio-handheld
+        options: >
+          {% set p = state_attr('sensor.tower_radio_preset', 'presets') %}
+          {{ p | map(attribute='title') | list if p else ['GSP + GMU (Tower + Approach)'] }}
+        state: "{{ states('sensor.tower_radio_preset') }}"
+        select_option:
+          - action: rest_command.tower_radio_tune
+            data:
+              preset: >
+                {{ state_attr('sensor.tower_radio_preset', 'presets') | selectattr('title', 'eq', option) | map(attribute='id') | first }}
+          - delay: 2
+          - action: homeassistant.update_entity
+            target:
+              entity_id: sensor.tower_radio_preset
