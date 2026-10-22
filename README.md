@@ -102,6 +102,9 @@ The Car Thing has no speaker, so **Play on PC** plays the tower audio on the com
    ```
    And for tower audio, an iframe card: `type: iframe` with `url: /local/tower-radio.html`.
 6. Restart Home Assistant.
+7. **Want the whole Planes tab in one go?** Use [`homeassistant/dashboard-planes.yaml`](homeassistant/dashboard-planes.yaml): open your dashboard → pencil (Edit) → **+** to add a view → three dots → **Edit in YAML**, paste the file in, change `YOUR_PI_IP`, and save. You get the radar, plane stats, Pi health and the tower radio picker (from `packages/tower_radio.yaml`) laid out like the photos.
+
+**Fun extras:** the **Overhead** tile says "No" most of the time and "Look up or duck!" when a plane is right above you. Temperatures show in whatever unit you pick for each sensor (entity settings → unit). The alerts convert on their own and trigger at 70 °C / 158 °F.
 
 ## Privacy note
 
