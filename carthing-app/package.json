@@ -1,0 +1,29 @@
+{
+  "name": "planeradar",
+  "private": true,
+  "version": "0.12.2",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "npx @deskthing/cli dev --vite",
+    "build": "npx @deskthing/cli package",
+    "typecheck": "tsc -p tsconfig.app.json --noEmit"
+  },
+  "dependencies": {
+    "@deskthing/client": "0.11.2",
+    "@deskthing/server": "0.11.6",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@deskthing/cli": "0.11.15",
+    "@deskthing/types": "0.11.18",
+    "@types/node": "^22.10.7",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "esbuild": "^0.19.2",
+    "typescript": "^5.5.3",
+    "vite": "^5.4.15"
+  }
+}

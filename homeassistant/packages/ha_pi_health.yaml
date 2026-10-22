@@ -1,0 +1,57 @@
+# Home Assistant Pi health: flag + alerts (uses the System Monitor and Raspberry Pi Power Supply Checker integrations)
+template:
+  - binary_sensor:
+      # On when the HA Pi is too hot (70°C+), low on power, or its SD card / memory is 90%+ full, for 2 minutes straight.
+      - name: Home Assistant Pi Needs Attention
+        unique_id: ha_pi_attention
+        device_class: problem
+        delay_on: "00:02:00"
+        state: >
+          {% set ent = 'sensor.system_monitor_processor_temperature' %}
+          {% set r = namespace(list=[]) %}
+          {% set t = states(ent) | float(0) %}
+          {% set c = (t - 32) * 5 / 9 if state_attr(ent, 'unit_of_measurement') == '°F' else t %}
+          {% if c >= 70 %}{% set r.list = r.list + ['hot'] %}{% endif %}
+          {% if is_state('binary_sensor.rpi_power_status', 'on') %}{% set r.list = r.list + ['power'] %}{% endif %}
+          {% if states('sensor.system_monitor_disk_usage_config') | float(0) >= 90 %}{% set r.list = r.list + ['disk'] %}{% endif %}
+          {% if states('sensor.system_monitor_memory_usage') | float(0) >= 90 %}{% set r.list = r.list + ['memory'] %}{% endif %}
+          {{ r.list | length > 0 }}
+        attributes:
+          reasons: >
+            {% set ent = 'sensor.system_monitor_processor_temperature' %}
+            {% set r = namespace(list=[]) %}
+            {% set t = states(ent) | float(0) %}
+            {% set c = (t - 32) * 5 / 9 if state_attr(ent, 'unit_of_measurement') == '°F' else t %}
+            {% if c >= 70 %}{% set r.list = r.list + ['running hot at ' ~ (c | round(0) | int) ~ '°C (' ~ ((c * 9 / 5 + 32) | round(0) | int) ~ '°F)'] %}{% endif %}
+            {% if is_state('binary_sensor.rpi_power_status', 'on') %}{% set r.list = r.list + ['low power from the PoE HAT'] %}{% endif %}
+            {% if states('sensor.system_monitor_disk_usage_config') | float(0) >= 90 %}{% set r.list = r.list + ['SD card is ' ~ states('sensor.system_monitor_disk_usage_config') ~ '% full'] %}{% endif %}
+            {% if states('sensor.system_monitor_memory_usage') | float(0) >= 90 %}{% set r.list = r.list + ['memory is ' ~ states('sensor.system_monitor_memory_usage') ~ '% used'] %}{% endif %}
+            {{ r.list | join(', ') if r.list else 'all good' }}
+
+automation:
+  - id: ha_pi_alert
+    alias: Home Assistant Pi needs attention
+    description: Leaves a notification in HA that stays until you dismiss it, and pings your phone (change notify.mobile_app_YOUR_PHONE to your phone's notify service).
+    mode: single
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.home_assistant_pi_needs_attention
+        to: "on"
+    action:
+      - service: persistent_notification.create
+        data:
+          notification_id: ha_pi_alert
+          title: "Home Assistant Pi needs attention"
+          message: >
+            Since {{ now().strftime('%a %b %-d at %-I:%M %p') }}: {{ state_attr('binary_sensor.home_assistant_pi_needs_attention', 'reasons') }}.
+            Check the Misc tab on dashboard #1. This stays here until you dismiss it.
+      - service: notify.mobile_app_YOUR_PHONE
+        continue_on_error: true
+        data:
+          title: "Home Assistant Pi needs attention"
+          message: "{{ state_attr('binary_sensor.home_assistant_pi_needs_attention', 'reasons') }}"
+          data:
+            tag: ha_pi_alert
+            url: /dashboard-1/more
+            push:
+              interruption-level: time-sensitive

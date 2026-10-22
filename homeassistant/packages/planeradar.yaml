@@ -1,0 +1,189 @@
+# Plane Radar package: live planes from the plane radar Pi (YOUR_PI_IP)
+# The script in /config/planeradar/fetch.py does the fetching; the sensors below read its output.
+
+command_line:
+  - sensor:
+      name: Plane Radar Data
+      unique_id: planeradar_data
+      command: "python3 /config/planeradar/fetch.py"
+      scan_interval: 5
+      command_timeout: 10
+      icon: mdi:radar
+      value_template: "{{ value_json.count if value_json.count is not none else 'unavailable' }}"
+      json_attributes:
+        - total
+        - rx
+        - within_10
+        - closest
+        - closest_desc
+        - closest_dist
+        - closest_alt
+        - highest
+        - highest_alt
+        - overhead
+        - planes
+        - error
+
+template:
+  - sensor:
+      - name: Planes Tracked
+        unique_id: planeradar_tracked
+        icon: mdi:airplane
+        unit_of_measurement: planes
+        state_class: measurement
+        state: "{{ states('sensor.plane_radar_data') }}"
+        availability: "{{ states('sensor.plane_radar_data') | is_number }}"
+      - name: Planes Within 10 Miles
+        unique_id: planeradar_within_10
+        icon: mdi:airplane-marker
+        unit_of_measurement: planes
+        state_class: measurement
+        state: "{{ state_attr('sensor.plane_radar_data', 'within_10') }}"
+        availability: "{{ state_attr('sensor.plane_radar_data', 'within_10') is not none }}"
+      - name: Closest Plane
+        unique_id: planeradar_closest
+        icon: mdi:airplane-search
+        state: "{{ state_attr('sensor.plane_radar_data', 'closest') }}"
+        availability: "{{ state_attr('sensor.plane_radar_data', 'closest') is not none }}"
+        attributes:
+          aircraft: "{{ state_attr('sensor.plane_radar_data', 'closest_desc') }}"
+      - name: Closest Plane Distance
+        unique_id: planeradar_closest_distance
+        icon: mdi:map-marker-distance
+        unit_of_measurement: mi
+        state: "{{ state_attr('sensor.plane_radar_data', 'closest_dist') }}"
+        availability: "{{ state_attr('sensor.plane_radar_data', 'closest_dist') is not none }}"
+      - name: Closest Plane Altitude
+        unique_id: planeradar_closest_altitude
+        icon: mdi:altimeter
+        unit_of_measurement: ft
+        state: "{{ state_attr('sensor.plane_radar_data', 'closest_alt') }}"
+        availability: "{{ state_attr('sensor.plane_radar_data', 'closest_alt') is not none }}"
+      - name: Highest Plane Altitude
+        unique_id: planeradar_highest_altitude
+        icon: mdi:arrow-up-bold-circle-outline
+        unit_of_measurement: ft
+        state: "{{ state_attr('sensor.plane_radar_data', 'highest_alt') }}"
+        availability: "{{ state_attr('sensor.plane_radar_data', 'highest_alt') is not none }}"
+        attributes:
+          callsign: "{{ state_attr('sensor.plane_radar_data', 'highest') }}"
+  - binary_sensor:
+      - name: Plane Overhead
+        unique_id: planeradar_overhead
+        icon: mdi:airplane-alert
+        state: "{{ state_attr('sensor.plane_radar_data', 'overhead') }}"
+        delay_off: "00:00:30"
+      # One "something's wrong with the plane radar Pi" flag: too hot (70°C+), low power, SD card 90%+ full, or not answering.
+      # It has to stay wrong for 2 minutes before it turns on, so short blips don't cause alerts.
+      - name: Plane Radar Pi Needs Attention
+        unique_id: planeradar_pi_attention
+        device_class: problem
+        delay_on: "00:02:00"
+        state: >
+            {% set ent = 'sensor.plane_radar_pi_temperature' %}
+            {% set r = namespace(list=[]) %}
+            {% if states(ent) in ['unavailable', 'unknown'] %}
+              {% set r.list = r.list + ['the Pi is not answering (offline or rebooting)'] %}
+            {% else %}
+              {% set t = states(ent) | float(0) %}
+              {% set c = (t - 32) * 5 / 9 if state_attr(ent, 'unit_of_measurement') == '°F' else t %}
+              {% if c >= 70 %}{% set r.list = r.list + ['running hot at ' ~ (c | round(0) | int) ~ '°C (' ~ ((c * 9 / 5 + 32) | round(0) | int) ~ '°F)'] %}{% endif %}
+              {% if is_state('binary_sensor.plane_radar_pi_problem', 'on') %}{% set r.list = r.list + ['low power or heat throttling right now'] %}{% endif %}
+              {% if states('sensor.plane_radar_pi_disk') | float(0) >= 90 %}{% set r.list = r.list + ['SD card is ' ~ states('sensor.plane_radar_pi_disk') ~ '% full'] %}{% endif %}
+            {% endif %}
+            {{ r.list | length > 0 }}
+        attributes:
+          reasons: >
+            {% set ent = 'sensor.plane_radar_pi_temperature' %}
+            {% set r = namespace(list=[]) %}
+            {% if states(ent) in ['unavailable', 'unknown'] %}
+              {% set r.list = r.list + ['the Pi is not answering (offline or rebooting)'] %}
+            {% else %}
+              {% set t = states(ent) | float(0) %}
+              {% set c = (t - 32) * 5 / 9 if state_attr(ent, 'unit_of_measurement') == '°F' else t %}
+              {% if c >= 70 %}{% set r.list = r.list + ['running hot at ' ~ (c | round(0) | int) ~ '°C (' ~ ((c * 9 / 5 + 32) | round(0) | int) ~ '°F)'] %}{% endif %}
+              {% if is_state('binary_sensor.plane_radar_pi_problem', 'on') %}{% set r.list = r.list + ['low power or heat throttling right now'] %}{% endif %}
+              {% if states('sensor.plane_radar_pi_disk') | float(0) >= 90 %}{% set r.list = r.list + ['SD card is ' ~ states('sensor.plane_radar_pi_disk') ~ '% full'] %}{% endif %}
+            {% endif %}
+            {{ r.list | join(', ') if r.list else 'all good' }}
+
+# The raw plane list changes every 5 seconds; keep it out of the history database so it doesn't fill the SD card.
+recorder:
+  exclude:
+    entities:
+      - sensor.plane_radar_data
+
+# Health of the plane radar Pi itself (written by the pistats service on the Pi every 10 seconds)
+rest:
+  - resource: http://YOUR_PI_IP/tar1090/data/pistats.json
+    scan_interval: 30
+    timeout: 10
+    sensor:
+      - name: Plane Radar Pi Temperature
+        unique_id: planeradar_pi_temperature
+        device_class: temperature
+        state_class: measurement
+        unit_of_measurement: "°C"
+        value_template: "{{ value_json.temp_c }}"
+      - name: Plane Radar Pi CPU
+        unique_id: planeradar_pi_cpu
+        icon: mdi:cpu-64-bit
+        state_class: measurement
+        unit_of_measurement: "%"
+        value_template: "{{ value_json.cpu_pct }}"
+      - name: Plane Radar Pi Memory
+        unique_id: planeradar_pi_memory
+        icon: mdi:memory
+        state_class: measurement
+        unit_of_measurement: "%"
+        value_template: "{{ value_json.mem_pct }}"
+      - name: Plane Radar Pi Disk
+        unique_id: planeradar_pi_disk
+        icon: mdi:sd
+        state_class: measurement
+        unit_of_measurement: "%"
+        value_template: "{{ value_json.disk_pct }}"
+      - name: Plane Radar Pi CPU Speed
+        unique_id: planeradar_pi_cpu_speed
+        icon: mdi:speedometer
+        state_class: measurement
+        unit_of_measurement: MHz
+        value_template: "{{ value_json.cpu_mhz }}"
+      - name: Plane Radar Pi Last Boot
+        unique_id: planeradar_pi_last_boot
+        device_class: timestamp
+        value_template: "{{ (value_json.now - value_json.uptime_s) | as_datetime }}"
+    binary_sensor:
+      # On when the Pi is short on power or too hot right now (the Pi's own throttle flags)
+      - name: Plane Radar Pi Problem
+        unique_id: planeradar_pi_problem
+        device_class: problem
+        value_template: "{{ (value_json.throttled | int(0, base=16)) % 16 > 0 }}"
+
+automation:
+  - id: planeradar_pi_alert
+    alias: Plane Radar Pi needs attention
+    description: Leaves a notification in HA that stays until you dismiss it, and pings your phone (change notify.mobile_app_YOUR_PHONE to your phone's notify service).
+    mode: single
+    trigger:
+      - platform: state
+        entity_id: binary_sensor.plane_radar_pi_needs_attention
+        to: "on"
+    action:
+      - service: persistent_notification.create
+        data:
+          notification_id: planeradar_pi_alert
+          title: "Plane Radar Pi needs attention"
+          message: >
+            Since {{ now().strftime('%a %b %-d at %-I:%M %p') }}: {{ state_attr('binary_sensor.plane_radar_pi_needs_attention', 'reasons') }}.
+            Check the Planes tab on dashboard #1. This stays here until you dismiss it.
+      - service: notify.mobile_app_YOUR_PHONE
+        continue_on_error: true
+        data:
+          title: "Plane Radar Pi needs attention"
+          message: "{{ state_attr('binary_sensor.plane_radar_pi_needs_attention', 'reasons') }}"
+          data:
+            tag: planeradar_pi_alert
+            url: /dashboard-1/planes
+            push:
+              interruption-level: time-sensitive

@@ -1,0 +1,88 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body, #root { width: 100%; height: 100%; background: #04342C; overflow: hidden; }
+body { font-family: "DejaVu Sans Mono", Menlo, Consolas, monospace; color: #E1F5EE; }
+button { background: transparent; border: none; color: inherit; font: inherit; }
+button:focus { outline: none; }
+
+.app { width: 100vw; height: 100vh; display: flex; flex-direction: column; }
+.top { height: 46px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px;
+  color: #5DCAA5; font-size: 18px; border-bottom: 1px solid #0F6E56; }
+.tabs { display: flex; gap: 6px; }
+.tab { padding: 6px 12px; border-radius: 8px; color: #5DCAA5; font-size: 16px; }
+.tab.on { background: #085041; color: #FAC775; }
+.tab .num { opacity: 0.6; font-size: 13px; }
+
+.body { flex: 1; display: flex; min-height: 0; }
+.body.map { align-items: center; padding-left: 12px; gap: 8px; }
+.body.center { flex-direction: column; align-items: center; justify-content: center; gap: 10px; }
+
+.list { width: 290px; overflow-y: auto; border-right: 1px solid #0F6E56; padding: 6px; }
+.row { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 8px; font-size: 20px; color: #9FE1CB; }
+.row.on { background: #085041; color: #FAC775; outline: 2px solid #EF9F27; }
+.row .cs { flex: 1; }
+.row .dist { font-size: 16px; color: #5DCAA5; }
+.row.on .dist { color: #FAC775; }
+.dot { width: 10px; height: 10px; border-radius: 5px; flex-shrink: 0; }
+.empty { color: #5DCAA5; padding: 20px; }
+
+.detail { flex: 1; padding: 16px 22px; display: flex; flex-direction: column; gap: 10px; }
+.detail.compact { padding: 10px 14px; gap: 8px; }
+.callsign { font-size: 40px; color: #FAC775; font-weight: bold; }
+.compact .callsign { font-size: 32px; }
+.sub { font-size: 17px; color: #9FE1CB; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 18px; margin-top: 4px; }
+.grid label, .stat label { display: block; font-size: 13px; color: #5DCAA5; letter-spacing: 1px; }
+.grid span { font-size: 22px; }
+.compact .grid { grid-template-columns: 1fr; gap: 6px; }
+.compact .grid span { font-size: 19px; }
+.look { margin-top: 4px; font-size: 18px; color: #EF9F27; }
+
+.statgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 40px; }
+.stat .value { font-size: 36px; color: #FAC775; }
+.big { font-size: 34px; color: #FAC775; }
+
+.muted { color: #5DCAA5; }
+.small { font-size: 14px; }
+.status { flex: 1; display: flex; align-items: center; justify-content: center; text-align: center;
+  padding: 30px; font-size: 22px; color: #F0997B; }
+.banner { background: #4A1B0C; color: #F5C4B3; font-size: 14px; padding: 4px 16px; }
+
+.bottom { height: 44px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px;
+  border-top: 1px solid #0F6E56; font-size: 15px; color: #9FE1CB; }
+.bottom b { color: #5DCAA5; font-weight: normal; margin-right: 6px; }
+.bottom .hint { color: #5DCAA5; font-size: 13px; }
+
+/* keep the Car Thing's old browser from showing scrollbars */
+.list { overflow-x: hidden; scrollbar-width: none; }
+.list::-webkit-scrollbar { display: none; width: 0; height: 0; }
+.row .cs { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* v0.12: tower radio + "seen before" */
+.seen { border-left: 3px solid #EF9F27; padding-left: 8px; display: flex; flex-direction: column; gap: 2px; }
+.seen1 { font-size: 16px; color: #FAC775; }
+.seen2 { font-size: 14px; color: #9FE1CB; }
+.compact .seen1 { font-size: 15px; }
+.compact .seen2 { font-size: 13px; }
+.row.tuned .cs { color: #FAC775; }
+.radio-title { font-size: 30px; }
+.playbtn { margin-top: 8px; align-self: flex-start; background: #085041; color: #FAC775; border: 2px solid #EF9F27;
+  border-radius: 10px; font-size: 22px; padding: 10px 22px; }
+.playbtn.on { background: #4A1B0C; color: #F5C4B3; border-color: #E24B4A; }
+.bottom .tower { max-width: 520px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bottom { padding: 0 22px; }
+
+/* radio activity visualizer */
+.viz { position: relative; flex: 1; min-height: 90px; margin-top: 10px; display: flex; align-items: flex-end;
+  justify-content: space-between; padding: 8px 4px 22px; border: 1px solid #0F6E56; border-radius: 10px; background: #03251F; }
+.viz span { width: 9px; height: 8%; border-radius: 3px 3px 0 0; background: #1D9E75;
+  -webkit-animation: idle 2.4s ease-in-out infinite; animation: idle 2.4s ease-in-out infinite; }
+.viz.live span { background: #EF9F27; -webkit-animation-name: talk; animation-name: talk; }
+.viz span:nth-child(3n) { background: #5DCAA5; }
+.viz.live span:nth-child(3n) { background: #FAC775; }
+@-webkit-keyframes idle { 0%, 100% { height: 6%; } 50% { height: 14%; } }
+@keyframes idle { 0%, 100% { height: 6%; } 50% { height: 14%; } }
+@-webkit-keyframes talk { 0% { height: 15%; } 25% { height: 85%; } 50% { height: 35%; } 75% { height: 70%; } 100% { height: 20%; } }
+@keyframes talk { 0% { height: 15%; } 25% { height: 85%; } 50% { height: 35%; } 75% { height: 70%; } 100% { height: 20%; } }
+.vizlabel { position: absolute; left: 0; right: 0; bottom: 4px; text-align: center; font-size: 11px;
+  letter-spacing: 3px; color: #5DCAA5; }
+.viz.live .vizlabel { color: #EF9F27; }

@@ -1,0 +1,19 @@
+{
+  "id": "planeradar",
+  "isWebApp": true,
+  "requires": [],
+  "label": "Plane Radar",
+  "version": "0.12.2",
+  "version_code": 12.2,
+  "compatible_server": [11],
+  "compatible_client": [11],
+  "description": "Live planes from your own ADS-B receiver (readsb + tar1090 on a Raspberry Pi).",
+  "author": "ChefZuber",
+  "platforms": ["windows", "mac", "linux"],
+  "homepage": "",
+  "repository": "",
+  "tags": ["utility"],
+  "requiredVersions": { "server": ">=0.11.0", "client": ">=0.11.0" },
+  "updateUrl": "",
+  "template": "base"
+}

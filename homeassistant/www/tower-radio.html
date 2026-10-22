@@ -1,0 +1,72 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tower Radio</title>
+<!-- Plane Radar tower radio player for a Home Assistant iframe card.
+     Copy to /config/www/ and show it with:  type: iframe, url: /local/tower-radio.html
+     Change PI below to your plane radar Pi's address. -->
+<style>
+  :root { color-scheme: light dark; --bg: #f4f6f4; --fg: #1b221b; --dim: #5f6b5f; --accent: #2f8f3a; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #111511; --fg: #e4ece4; --dim: #8fa08f; --accent: #6fd27b; } }
+  body { margin: 0; padding: 14px 16px; font: 15px/1.4 system-ui, sans-serif; background: var(--bg); color: var(--fg); }
+  button { font: inherit; padding: 8px 18px; border-radius: 8px; border: 0; background: var(--accent); color: #fff; cursor: pointer; }
+  .row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .dim { color: var(--dim); font-size: 13px; }
+  #heard { margin-top: 8px; }
+</style>
+</head>
+<body>
+<div class="row">
+  <button id="btn">Play</button>
+  <div><div id="title">Tower radio</div><div class="dim" id="state">Stopped</div></div>
+</div>
+<div class="dim" id="heard"></div>
+<script>
+const PI = "YOUR_PI_IP";                       // e.g. 192.168.1.50
+const STREAM = `http://${PI}:8000/radio.mp3`;
+const TUNER = `http://${PI}:8091`;
+let audio = null, lastPos = 0, stuck = 0;
+const $ = (id) => document.getElementById(id);
+
+function start() {
+  stop();
+  audio = new Audio(STREAM + "?t=" + Date.now());   // fresh URL so the browser never replays old audio
+  audio.play().catch(() => {});
+  $("btn").textContent = "Stop"; $("state").textContent = "Connecting...";
+  audio.onplaying = () => { $("state").textContent = "Playing"; };
+}
+function stop() {
+  if (audio) { audio.pause(); audio.src = ""; audio = null; }
+  $("btn").textContent = "Play"; $("state").textContent = "Stopped"; stuck = 0;
+}
+$("btn").onclick = () => (audio ? stop() : start());
+
+setInterval(() => {
+  if (!audio || audio.paused) return;
+  // Catch-up: if the browser has fallen behind live, play 8% faster until it's within 3 s (no jumping, so nothing repeats).
+  if (audio.buffered.length) {
+    const lag = audio.buffered.end(audio.buffered.length - 1) - audio.currentTime;
+    audio.playbackRate = lag > 3 ? 1.08 : 1.0;
+  }
+  // Watchdog: silence still advances the clock, so a clock that stops for 25 s means the stream dropped.
+  if (audio.currentTime === lastPos) { if (++stuck >= 25) start(); } else stuck = 0;
+  lastPos = audio.currentTime;
+}, 1000);
+
+async function poll() {
+  try {
+    const s = await (await fetch(TUNER + "/status")).json();
+    $("title").textContent = s.title || "Tower radio";
+    const lh = s.last_heard;
+    if (lh) {
+      const ago = s.now - lh.ts;
+      $("heard").textContent = "Last heard: " + lh.label + " · " + (ago < 60 ? ago + "s ago" : Math.round(ago / 60) + " min ago");
+    }
+  } catch (e) { $("heard").textContent = "Can't reach the tuner on " + PI; }
+}
+poll(); setInterval(poll, 5000);
+</script>
+</body>
+</html>
