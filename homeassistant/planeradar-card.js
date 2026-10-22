@@ -214,37 +214,76 @@ class PlaneRadarCard extends HTMLElement {
     g.save();
     g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2); g.clip();
 
+    // Label collision boxes: every label checks these first, so names never sit on top of each other.
+    const taken = [];
+    const free = (b) => b.x >= cx - R && b.x + b.w <= cx + R && b.y >= cy - R && b.y + b.h <= cy + R &&
+      !taken.some((t) => b.x < t.x + t.w && t.x < b.x + b.w && b.y < t.y + t.h && t.y < b.y + b.h);
+    const take = (x, y, w, h) => { const b = { x, y, w, h }; taken.push(b); return b; };
+    // Try right, left, above, below; if all are blocked the label waits until there's room.
+    const placeLabel = (text, x, y, font, gap) => {
+      g.font = font;
+      const w = g.measureText(text).width + 2, h = 11;
+      const spots = [[x + gap, y - h / 2], [x - gap - w, y - h / 2], [x - w / 2, y - gap - h], [x - w / 2, y + gap]];
+      for (const [lx, ly] of spots) {
+        const b = { x: lx, y: ly, w, h };
+        if (free(b)) { taken.push(b); return b; }
+      }
+      return null;
+    };
+    // Arrow pointing where the plane is heading (a diamond if heading is unknown)
+    const arrow = (x, y, track, size, col, outline) => {
+      g.save(); g.translate(x, y);
+      g.beginPath();
+      if (track === null) {
+        g.moveTo(0, -size * 0.7); g.lineTo(size * 0.7, 0); g.lineTo(0, size * 0.7); g.lineTo(-size * 0.7, 0);
+      } else {
+        g.rotate((track * Math.PI) / 180);
+        g.moveTo(0, -size); g.lineTo(size * 0.62, size * 0.75); g.lineTo(0, size * 0.35); g.lineTo(-size * 0.62, size * 0.75);
+      }
+      g.closePath();
+      g.fillStyle = col; g.fill();
+      if (outline) { g.strokeStyle = outline; g.lineWidth = 1; g.stroke(); }
+      g.restore();
+    };
+
+    take(cx - 4, cy - 4, 8, 8);                     // home dot
+    take(cx - 8, cy - R + 2, 16, 15);               // "N"
+    [0.25, 0.5, 0.75].forEach((f) => take(cx + 2, cy - R * f - 13, 30, 12));   // ring mile labels
+
     // airports
     if (this._rx) {
-      g.font = "10px monospace"; g.textAlign = "left";
+      g.textAlign = "left"; g.textBaseline = "top";
       AIRPORTS.forEach((a) => {
         const x = cx + (a.lon - this._rx.lon) * MI_PER_DEG * Math.cos((this._rx.lat * Math.PI) / 180) * scale;
         const y = cy - (a.lat - this._rx.lat) * MI_PER_DEG * scale;
-        g.strokeStyle = "#5DCAA5"; g.strokeRect(x - 3, y - 3, 6, 6);
-        g.fillStyle = "#5DCAA5"; g.fillText(a.id, x + 6, y + 4);
+        g.strokeStyle = "#5DCAA5"; g.lineWidth = 1; g.strokeRect(x - 3, y - 3, 6, 6);
+        take(x - 4, y - 4, 8, 8);
+        const b = placeLabel(a.id, x, y, "10px monospace", 6);
+        if (b) { g.fillStyle = "#5DCAA5"; g.fillText(a.id, b.x + 1, b.y + 1); }
       });
     }
 
-    // planes
-    this._planes.forEach((p) => {
-      if (p.dist > this._range * 1.05) return;
-      const x = cx + p.east * scale, y = cy - p.north * scale;
-      const sel = p.hex === this._selected;
-      const col = sel ? "#FAC775" : altColor(p.alt);
-      if (p.track !== null) {
-        const t = (p.track * Math.PI) / 180, len = sel ? 16 : 10;
-        g.strokeStyle = col; g.lineWidth = sel ? 2 : 1.2;
-        g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.sin(t) * len, y - Math.cos(t) * len); g.stroke();
-      }
-      g.fillStyle = col;
-      g.beginPath(); g.arc(x, y, sel ? 5 : 3.5, 0, Math.PI * 2); g.fill();
-      if (sel) {
-        g.strokeStyle = "#EF9F27"; g.lineWidth = 1.5;
-        g.beginPath(); g.arc(x, y, 10, 0, Math.PI * 2); g.stroke();
-        g.fillStyle = "#FAC775"; g.font = "bold 12px monospace"; g.textAlign = "left";
-        g.fillText(p.cs, x + 12, y - 8);
-      }
+    // planes: arrows first (they take their space), then names. Selected plane and closest planes get names first.
+    const shown = this._planes.filter((p) => p.dist <= this._range * 1.05)
+      .map((p) => ({ p, x: cx + p.east * scale, y: cy - p.north * scale, sel: p.hex === this._selected }));
+    const big = Math.max(5, Math.min(9, size / 60));
+    shown.forEach((s) => take(s.x - big, s.y - big, big * 2, big * 2));
+    shown.filter((s) => !s.sel).forEach((s) => arrow(s.x, s.y, s.p.track, big, altColor(s.p.alt), "#03251F"));
+    const sel = shown.find((s) => s.sel);
+    if (sel) {
+      g.strokeStyle = "#EF9F27"; g.lineWidth = 1.5;
+      g.beginPath(); g.arc(sel.x, sel.y, big + 6, 0, Math.PI * 2); g.stroke();
+      arrow(sel.x, sel.y, sel.p.track, big * 1.35, "#FAC775", "#03251F");
+    }
+    g.textAlign = "left"; g.textBaseline = "top";
+    [...(sel ? [sel] : []), ...shown.filter((s) => !s.sel).sort((a, b) => a.p.dist - b.p.dist)].forEach((s) => {
+      const font = s.sel ? "bold 12px monospace" : "10px monospace";
+      const b = placeLabel(s.p.cs, s.x, s.y, font, s.sel ? big + 9 : big + 3);
+      if (!b) return;
+      g.fillStyle = s.sel ? "#FAC775" : "#CFEDE2";
+      g.fillText(s.p.cs, b.x + 1, b.y + (s.sel ? 0 : 1));
     });
+    g.textBaseline = "alphabetic";
     g.restore();
 
     // home

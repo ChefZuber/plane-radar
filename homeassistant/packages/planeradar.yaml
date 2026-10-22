@@ -107,6 +107,13 @@ template:
             {% endif %}
             {{ r.list | join(', ') if r.list else 'all good' }}
 
+  # Friendly words for the "Overhead" tile: "No", or a warning when a plane is right above
+  - sensor:
+      - name: Plane Overhead Status
+        unique_id: planeradar_overhead_status
+        icon: "{{ 'mdi:airplane-alert' if is_state('binary_sensor.plane_overhead', 'on') else 'mdi:airplane-off' }}"
+        state: "{{ 'Look up or duck!' if is_state('binary_sensor.plane_overhead', 'on') else 'No' }}"
+
 # The raw plane list changes every 5 seconds; keep it out of the history database so it doesn't fill the SD card.
 recorder:
   exclude:
