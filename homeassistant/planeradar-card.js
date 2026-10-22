@@ -54,7 +54,17 @@ class PlaneRadarCard extends HTMLElement {
   connectedCallback() {
     if (!this._built) this._build();
     this._poll();
-    const frame = () => { this._draw(); this._raf = requestAnimationFrame(frame); };
+    // Old/slow devices (e.g. a 2013 iPad): if drawing takes too long, drop to ~10 frames a second.
+    let last = 0, avg = 0, slow = false;
+    const frame = (t) => {
+      this._raf = requestAnimationFrame(frame);
+      if (document.hidden || (slow && t - last < 100)) return;
+      last = t;
+      const t0 = performance.now();
+      this._draw();
+      avg = avg * 0.9 + (performance.now() - t0) * 0.1;
+      if (avg > 8) slow = true;
+    };
     this._raf = requestAnimationFrame(frame);
   }
 
@@ -138,7 +148,7 @@ class PlaneRadarCard extends HTMLElement {
         hex: p.hex, cs: p.cs, reg: p.reg, desc: p.desc, alt: p.alt, gs: p.gs, track: p.trk,
         north: p.n, east: p.e, dist: p.d, bearing: p.brg,
       }));
-      if (!this._planes.some((p) => p.hex === this._selected)) this._selected = this._planes[0]?.hex || null;
+      if (!this._planes.some((p) => p.hex === this._selected)) this._selected = this._planes.length ? this._planes[0].hex : null;
     }
     this._renderSide();
   }
@@ -166,7 +176,7 @@ class PlaneRadarCard extends HTMLElement {
     this._detailEl.innerHTML = `
       <div class="cs">${p.cs}</div>
       <div>${[op, p.desc].filter(Boolean).join(" · ") || p.reg || "Unknown aircraft"}</div>
-      <div>${p.alt === null ? "Ground" : commas(p.alt) + " ft"} · ${p.gs ?? "—"} kt · ${p.track !== null ? compass(p.track) : "—"}</div>
+      <div>${p.alt === null ? "Ground" : commas(p.alt) + " ft"} · ${p.gs != null ? p.gs : "—"} kt · ${p.track !== null ? compass(p.track) : "—"}</div>
       <div class="look">Look ${compass(p.bearing)}, ${height}</div>`;
   }
 
@@ -175,7 +185,7 @@ class PlaneRadarCard extends HTMLElement {
     if (!c) return;
     const rect = c.parentElement.getBoundingClientRect();
     const size = Math.max(120, Math.floor(Math.min(rect.width, rect.height)));
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
     if (c.width !== size * dpr) {
       c.width = c.height = size * dpr;
       c.style.width = c.style.height = size + "px";
@@ -209,6 +219,11 @@ class PlaneRadarCard extends HTMLElement {
       sw.addColorStop(0.0955, "rgba(93,202,165,0)");
       g.fillStyle = sw;
       g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2); g.fill();
+    } else {
+      // Older browsers (e.g. iOS 12 Safari) have no conic gradients: draw a plain translucent wedge instead.
+      const end = this._sweep - Math.PI / 2;
+      g.fillStyle = "rgba(93,202,165,0.16)";
+      g.beginPath(); g.moveTo(cx, cy); g.arc(cx, cy, R, end - 0.6, end); g.closePath(); g.fill();
     }
 
     g.save();
