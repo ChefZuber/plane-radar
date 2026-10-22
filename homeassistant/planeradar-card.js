@@ -216,7 +216,8 @@ class PlaneRadarCard extends HTMLElement {
 
     // Label collision boxes: every label checks these first, so names never sit on top of each other.
     const taken = [];
-    const free = (b) => b.x >= cx - R && b.x + b.w <= cx + R && b.y >= cy - R && b.y + b.h <= cy + R &&
+    const inCircle = (x, y) => (x - cx) ** 2 + (y - cy) ** 2 <= (R - 3) ** 2;
+    const free = (b) => inCircle(b.x, b.y) && inCircle(b.x + b.w, b.y) && inCircle(b.x, b.y + b.h) && inCircle(b.x + b.w, b.y + b.h) &&
       !taken.some((t) => b.x < t.x + t.w && t.x < b.x + b.w && b.y < t.y + t.h && t.y < b.y + b.h);
     const take = (x, y, w, h) => { const b = { x, y, w, h }; taken.push(b); return b; };
     // Try right, left, above, below; if all are blocked the label waits until there's room.
