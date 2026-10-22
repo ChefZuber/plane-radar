@@ -1,0 +1,61 @@
+# The whole "Planes" dashboard tab: radar, plane stats, Pi health and the tower radio.
+# How to add it: open your dashboard > pencil (Edit) > "+" to add a view > three dots > "Edit in YAML",
+# then replace everything there with this file and Save.
+# Needs: planeradar-card.js added as a dashboard resource, the packages in packages/, and www/tower-radio.html.
+title: Planes
+path: planes
+icon: mdi:airplane
+type: panel
+cards:
+  - type: horizontal-stack
+    cards:
+      - type: custom:planeradar-card
+        entity: sensor.plane_radar_data
+        range: 25
+        rows: 8
+        map_url: http://YOUR_PI_IP/tar1090/
+      - type: vertical-stack
+        cards:
+          - type: heading
+            heading: Right now
+            icon: mdi:airplane
+            heading_style: title
+          - type: horizontal-stack
+            cards:
+              - { type: tile, entity: sensor.planes_tracked, name: Tracked, vertical: true }
+              - { type: tile, entity: sensor.planes_within_10_miles, name: Within 10 mi, vertical: true }
+              - { type: tile, entity: sensor.plane_overhead_status, name: Overhead, vertical: true }
+          - type: heading
+            heading: Closest plane
+            icon: mdi:airplane-search
+            heading_style: subtitle
+          - { type: tile, entity: sensor.closest_plane, name: Callsign }
+          - type: horizontal-stack
+            cards:
+              - { type: tile, entity: sensor.closest_plane_distance, name: Distance, vertical: true }
+              - { type: tile, entity: sensor.closest_plane_altitude, name: Altitude, vertical: true }
+              - { type: tile, entity: sensor.highest_plane_altitude, name: Highest up, vertical: true }
+          - type: heading
+            heading: Pi health
+            icon: mdi:raspberry-pi
+            heading_style: subtitle
+          - type: horizontal-stack
+            cards:
+              - { type: tile, entity: sensor.plane_radar_pi_temperature, name: Temp, vertical: true }
+              - { type: tile, entity: sensor.plane_radar_pi_cpu, name: CPU, vertical: true }
+              - { type: tile, entity: sensor.plane_radar_pi_memory, name: Memory, vertical: true }
+              - { type: tile, entity: sensor.plane_radar_pi_disk, name: SD card, vertical: true }
+              - { type: tile, entity: binary_sensor.plane_radar_pi_needs_attention, name: Status, vertical: true }
+          - type: heading
+            heading: Tower radio
+            icon: mdi:radio-tower
+            heading_style: subtitle
+          - type: tile
+            entity: select.tower_radio
+            name: Listening to
+            features:
+              - type: select-options
+            features_position: inline
+          - type: iframe
+            url: /local/tower-radio.html
+            aspect_ratio: 17%
