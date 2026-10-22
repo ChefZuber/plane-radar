@@ -36,6 +36,10 @@ A second USB radio adds **live air traffic control audio** (tower, approach, cen
 | Elecrow 2.1" ESP32-S3 rotary round display (480×480) | Desk radar screen. *Optional* | $45 |
 | Spotify Car Thing running DeskThing | Control panel. *Optional* | — |
 
+## Quick start
+
+Don't want to build anything? Ready-made files for the Car Thing app and the round display are in [`downloads/`](downloads/).
+
 ## Setup
 
 You'll need to be comfortable copying files to a Pi and running a few commands. Each step says what to change.

@@ -6,3 +6,4 @@ build/
 *.map
 .DS_Store
 .env
+!downloads/*.bin
