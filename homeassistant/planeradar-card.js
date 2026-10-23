@@ -101,6 +101,22 @@ class PlaneRadarCard extends HTMLElement {
         .detail .cs { color: #FAC775; font-size: 20px; font-weight: bold; }
         .detail .look { color: #EF9F27; }
         .msg { color: #F0997B; padding: 12px; font-size: 14px; }
+        /* Phone-sized card only (under 600px wide): tighter list so full callsigns fit. Wide screens are unchanged. */
+        ha-card.narrow .top { font-size: 13px; padding: 8px 10px; flex-wrap: wrap; gap: 4px; }
+        ha-card.narrow .ranges button, ha-card.narrow .maplink { font-size: 11px; padding: 2px 5px; }
+        ha-card.narrow .body { gap: 6px; padding: 6px; }
+        ha-card.narrow .scope { flex: 1.4; }
+        ha-card.narrow .row { gap: 5px; padding: 3px 5px; font-size: 12px; }
+        ha-card.narrow .row .d { font-size: 10px; }
+        ha-card.narrow .row .u { display: none; }
+        ha-card.narrow .dot { width: 6px; height: 6px; }
+        ha-card.narrow .detail { font-size: 11px; line-height: 1.4; }
+        ha-card.narrow .detail .cs { font-size: 16px; }
+        /* Very narrow (phone held upright): callsigns only in the list; the distance is in the detail below. */
+        .dd { display: none; }
+        ha-card.tiny .dd { display: inline; }
+        ha-card.tiny .row .d { display: none; }
+        ha-card.tiny .scope { flex: 1.15; }
       </style>
       <ha-card>
         <div class="top"><span class="count">PLANE RADAR</span><span><span class="ranges"></span><a class="maplink" target="_blank" rel="noopener">Full map ↗</a></span></div>
@@ -109,7 +125,15 @@ class PlaneRadarCard extends HTMLElement {
           <div class="side"><div class="list"></div><div class="detail"></div></div>
         </div>
       </ha-card>`;
-    root.querySelector("ha-card").style.height = this._cfg.height;
+    const card = root.querySelector("ha-card");
+    card.style.height = this._cfg.height;
+    if (window.ResizeObserver) {
+      new ResizeObserver(() => {
+        const w = card.getBoundingClientRect().width;
+        card.classList.toggle("narrow", w < 600);
+        card.classList.toggle("tiny", w < 300);
+      }).observe(card);
+    }
     root.querySelector(".maplink").href = this._cfg.map_url;
     this._canvas = root.querySelector("canvas");
     this._listEl = root.querySelector(".list");
@@ -165,7 +189,7 @@ class PlaneRadarCard extends HTMLElement {
       .slice(0, this._cfg.rows)
       .map((p) => `<div class="row ${p.hex === this._selected ? "on" : ""}" data-hex="${p.hex}">
           <span class="dot" style="background:${altColor(p.alt)}"></span>
-          <span class="cs">${p.cs}</span><span class="d">${p.dist.toFixed(1)}mi</span></div>`)
+          <span class="cs">${p.cs}</span><span class="d">${p.dist.toFixed(1)}<span class="u">mi</span></span></div>`)
       .join("");
     const p = this._planes.find((x) => x.hex === this._selected);
     if (!p) { this._detailEl.innerHTML = `<span>No planes with positions yet</span>`; return; }
@@ -177,7 +201,7 @@ class PlaneRadarCard extends HTMLElement {
       <div class="cs">${p.cs}</div>
       <div>${[op, p.desc].filter(Boolean).join(" · ") || p.reg || "Unknown aircraft"}</div>
       <div>${p.alt === null ? "Ground" : commas(p.alt) + " ft"} · ${p.gs != null ? p.gs : "—"} kt · ${p.track !== null ? compass(p.track) : "—"}</div>
-      <div class="look">Look ${compass(p.bearing)}, ${height}</div>`;
+      <div class="look">Look ${compass(p.bearing)}, ${height}<span class="dd"> · ${p.dist.toFixed(1)} mi</span></div>`;
   }
 
   _draw() {
@@ -192,7 +216,7 @@ class PlaneRadarCard extends HTMLElement {
     }
     const g = c.getContext("2d");
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const R = size / 2 - 4, cx = size / 2, cy = size / 2;
+    const R = size / 2 - 12, cx = size / 2, cy = size / 2 + 4;   // room above the ring for "N"
     const scale = R / this._range;
 
     g.clearRect(0, 0, size, size);
@@ -208,7 +232,7 @@ class PlaneRadarCard extends HTMLElement {
     });
     g.beginPath(); g.moveTo(cx - R, cy); g.lineTo(cx + R, cy); g.moveTo(cx, cy - R); g.lineTo(cx, cy + R); g.stroke();
     g.fillStyle = "#5DCAA5"; g.font = "bold 12px monospace"; g.textAlign = "center";
-    g.fillText("N", cx, cy - R + 14);
+    g.fillText("N", cx, cy - R - 3);   // sits just above the ring
 
     // sweep
     this._sweep = (this._sweep + 0.02) % (Math.PI * 2);
@@ -263,7 +287,6 @@ class PlaneRadarCard extends HTMLElement {
     };
 
     take(cx - 4, cy - 4, 8, 8);                     // home dot
-    take(cx - 8, cy - R + 2, 16, 15);               // "N"
     [0.25, 0.5, 0.75].forEach((f) => take(cx + 2, cy - R * f - 13, 30, 12));   // ring mile labels
 
     // airports
