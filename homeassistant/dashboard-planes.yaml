@@ -59,12 +59,14 @@ cards:
           - type: iframe
             url: /local/tower-radio.html
             aspect_ratio: 17%
-          # Optional: only if you feed Flightradar24
+          # Optional data-sharing tiles: keep the ones for the networks you feed and delete the rest
+          # (adsb.fi tile shows "Not installed" if you don't feed adsb.fi; FR24 tiles need the FR24 block in planeradar.yaml)
           - type: heading
             heading: Data sharing
             icon: mdi:share-variant
             heading_style: subtitle
           - type: horizontal-stack
             cards:
-              - { type: tile, entity: sensor.fr24_feed, name: Flightradar24, vertical: true }
-              - { type: tile, entity: sensor.fr24_planes_shared, name: Planes shared, vertical: true }
+              - { type: tile, entity: sensor.adsb_fi_feed, name: adsb.fi, vertical: true }          # adsb.fi
+              - { type: tile, entity: sensor.fr24_feed, name: Flightradar24, vertical: true }       # FR24
+              - { type: tile, entity: sensor.fr24_planes_shared, name: Planes shared, vertical: true }  # FR24
