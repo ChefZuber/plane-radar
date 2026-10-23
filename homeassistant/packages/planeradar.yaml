@@ -73,6 +73,12 @@ template:
         icon: mdi:airplane-alert
         state: "{{ state_attr('sensor.plane_radar_data', 'overhead') }}"
         delay_off: "00:00:30"
+      # On when the FR24 feed has been down for 15 minutes (short reconnects are normal and ignored)
+      - name: FR24 Feed Down
+        unique_id: planeradar_fr24_down
+        device_class: problem
+        delay_on: "00:15:00"
+        state: "{{ states('sensor.fr24_feed') != 'Feeding' }}"
       # One "something's wrong with the plane radar Pi" flag: too hot (70°C+), low power, SD card 90%+ full, or not answering.
       # It has to stay wrong for 2 minutes before it turns on, so short blips don't cause alerts.
       - name: Plane Radar Pi Needs Attention
@@ -90,6 +96,7 @@ template:
               {% if c >= 70 %}{% set r.list = r.list + ['running hot at ' ~ (c | round(0) | int) ~ '°C (' ~ ((c * 9 / 5 + 32) | round(0) | int) ~ '°F)'] %}{% endif %}
               {% if is_state('binary_sensor.plane_radar_pi_problem', 'on') %}{% set r.list = r.list + ['low power or heat throttling right now'] %}{% endif %}
               {% if states('sensor.plane_radar_pi_disk') | float(0) >= 90 %}{% set r.list = r.list + ['SD card is ' ~ states('sensor.plane_radar_pi_disk') ~ '% full'] %}{% endif %}
+              {% if is_state('binary_sensor.fr24_feed_down', 'on') %}{% set r.list = r.list + ['Flightradar24 feed is down'] %}{% endif %}
             {% endif %}
             {{ r.list | length > 0 }}
         attributes:
@@ -104,6 +111,7 @@ template:
               {% if c >= 70 %}{% set r.list = r.list + ['running hot at ' ~ (c | round(0) | int) ~ '°C (' ~ ((c * 9 / 5 + 32) | round(0) | int) ~ '°F)'] %}{% endif %}
               {% if is_state('binary_sensor.plane_radar_pi_problem', 'on') %}{% set r.list = r.list + ['low power or heat throttling right now'] %}{% endif %}
               {% if states('sensor.plane_radar_pi_disk') | float(0) >= 90 %}{% set r.list = r.list + ['SD card is ' ~ states('sensor.plane_radar_pi_disk') ~ '% full'] %}{% endif %}
+              {% if is_state('binary_sensor.fr24_feed_down', 'on') %}{% set r.list = r.list + ['Flightradar24 feed is down'] %}{% endif %}
             {% endif %}
             {{ r.list | join(', ') if r.list else 'all good' }}
 
@@ -166,6 +174,23 @@ rest:
         unique_id: planeradar_pi_problem
         device_class: problem
         value_template: "{{ (value_json.throttled | int(0, base=16)) % 16 > 0 }}"
+
+
+  # Flightradar24 feeder status (optional - delete this block if you don't feed FR24), read straight from the Pi (the FR24 feeder's own local status page)
+  - resource: http://YOUR_PI_IP:8754/monitor.json
+    scan_interval: 60
+    timeout: 10
+    sensor:
+      - name: FR24 Feed
+        unique_id: planeradar_fr24_feed
+        icon: mdi:access-point-network
+        value_template: "{{ 'Feeding' if value_json.feed_status == 'connected' else (value_json.feed_status | default('offline') | replace('_', ' ') | title) }}"
+      - name: FR24 Planes Shared
+        unique_id: planeradar_fr24_planes
+        icon: mdi:airplane-takeoff
+        unit_of_measurement: planes
+        state_class: measurement
+        value_template: "{{ value_json.feed_num_ac_tracked | int(0) }}"
 
 automation:
   - id: planeradar_pi_alert
