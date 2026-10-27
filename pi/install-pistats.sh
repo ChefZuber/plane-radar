@@ -5,7 +5,7 @@ set -e
 
 cat > /usr/local/bin/pistats.sh << 'EOS'
 #!/bin/bash
-# Writes Pi health (temperature, CPU, memory, disk, power warnings, adsb.fi feed state) as JSON every 10 seconds.
+# Writes Pi health (temperature, CPU, memory, disk, power warnings, adsb.fi and FlightAware feed state) as JSON every 10 seconds.
 OUT_DIR=/run/readsb
 cpu_sample() { awk '/^cpu /{print $2+$3+$4+$5+$6+$7+$8, $5+$6}' /proc/stat; }
 while true; do
@@ -22,9 +22,11 @@ while true; do
   svc() { systemctl list-unit-files "$1.service" --no-legend 2>/dev/null | grep -q . && systemctl is-active "$1" || echo missing; }
   afi=$(svc adsbfi-feed); afm=$(svc adsbfi-mlat)
   afc=$(ss -Htn state established '( dport = :30004 )' 2>/dev/null | wc -l)
+  faf=$(svc piaware)
+  fac=$(ss -Htn state established '( dport = :1200 )' 2>/dev/null | wc -l)
   if [ -d "$OUT_DIR" ]; then
-    printf '{"temp_c":%s,"cpu_pct":%s,"load_1m":%s,"mem_pct":%s,"disk_pct":%s,"uptime_s":%s,"cpu_mhz":%s,"throttled":"%s","adsbfi_feed":"%s","adsbfi_mlat":"%s","adsbfi_conn":%s,"now":%s}\n' \
-      "$temp" "$cpu" "$l1" "$mem" "$disk" "$up" "$freq" "$thr" "$afi" "$afm" "$afc" "$(date +%s)" > "$OUT_DIR/pistats.json.tmp"
+    printf '{"temp_c":%s,"cpu_pct":%s,"load_1m":%s,"mem_pct":%s,"disk_pct":%s,"uptime_s":%s,"cpu_mhz":%s,"throttled":"%s","adsbfi_feed":"%s","adsbfi_mlat":"%s","adsbfi_conn":%s,"fa_feed":"%s","fa_conn":%s,"now":%s}\n' \
+      "$temp" "$cpu" "$l1" "$mem" "$disk" "$up" "$freq" "$thr" "$afi" "$afm" "$afc" "$faf" "$fac" "$(date +%s)" > "$OUT_DIR/pistats.json.tmp"
     mv "$OUT_DIR/pistats.json.tmp" "$OUT_DIR/pistats.json"
   fi
   sleep 9

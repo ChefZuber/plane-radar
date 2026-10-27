@@ -85,6 +85,12 @@ template:
         device_class: problem
         delay_on: "00:15:00"
         state: "{{ states('sensor.fr24_feed') not in ['Feeding', 'unknown'] }}"
+      # Optional: on when the FlightAware feed has been down for 15 minutes (safe to keep even without PiAware - it stays off)
+      - name: FlightAware Feed Down
+        unique_id: planeradar_flightaware_down
+        device_class: problem
+        delay_on: "00:15:00"
+        state: "{{ states('sensor.flightaware_feed') not in ['Feeding', 'Not installed', 'unknown', 'unavailable'] }}"
       # One "something's wrong with the plane radar Pi" flag: too hot (70°C+), low power, SD card 90%+ full, or not answering.
       # It has to stay wrong for 2 minutes before it turns on, so short blips don't cause alerts.
       - name: Plane Radar Pi Needs Attention
@@ -104,6 +110,7 @@ template:
               {% if states('sensor.plane_radar_pi_disk') | float(0) >= 90 %}{% set r.list = r.list + ['SD card is ' ~ states('sensor.plane_radar_pi_disk') ~ '% full'] %}{% endif %}
               {% if is_state('binary_sensor.fr24_feed_down', 'on') %}{% set r.list = r.list + ['Flightradar24 feed is down'] %}{% endif %}
               {% if is_state('binary_sensor.adsb_fi_feed_down', 'on') %}{% set r.list = r.list + ['adsb.fi feed is down'] %}{% endif %}
+              {% if is_state('binary_sensor.flightaware_feed_down', 'on') %}{% set r.list = r.list + ['FlightAware feed is down'] %}{% endif %}
             {% endif %}
             {{ r.list | length > 0 }}
         attributes:
@@ -120,6 +127,7 @@ template:
               {% if states('sensor.plane_radar_pi_disk') | float(0) >= 90 %}{% set r.list = r.list + ['SD card is ' ~ states('sensor.plane_radar_pi_disk') ~ '% full'] %}{% endif %}
               {% if is_state('binary_sensor.fr24_feed_down', 'on') %}{% set r.list = r.list + ['Flightradar24 feed is down'] %}{% endif %}
               {% if is_state('binary_sensor.adsb_fi_feed_down', 'on') %}{% set r.list = r.list + ['adsb.fi feed is down'] %}{% endif %}
+              {% if is_state('binary_sensor.flightaware_feed_down', 'on') %}{% set r.list = r.list + ['FlightAware feed is down'] %}{% endif %}
             {% endif %}
             {{ r.list | join(', ') if r.list else 'all good' }}
 
@@ -189,6 +197,16 @@ rest:
         json_attributes:
           - adsbfi_mlat
           - adsbfi_conn
+      # Optional: FlightAware feed through PiAware (shows "Not installed" if you don't feed FlightAware)
+      - name: FlightAware Feed
+        unique_id: planeradar_flightaware_feed
+        icon: mdi:airplane-check
+        value_template: >
+          {% set f = value_json.fa_feed | default('missing') %}
+          {% if f == 'missing' %}Not installed
+          {% elif f == 'active' and (value_json.fa_conn | int(0)) > 0 %}Feeding
+          {% elif f == 'active' %}Connecting
+          {% else %}Stopped{% endif %}
     binary_sensor:
       # On when the Pi is short on power or too hot right now (the Pi's own throttle flags)
       - name: Plane Radar Pi Problem
